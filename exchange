@@ -1,0 +1,9 @@
+#! /bin/bash
+
+auth=$(echo -n "$OKTA_CLIENT_ID:$OKTA_CLIENT_SECRET" | base64)
+curl -i -X POST \
+  -H "Authorization: Basic $auth" \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'grant_type=authorization_code&redirect_uri=http%3A%2F%2Flocalhost%3A8080/callback&code=PfxVM9HH-azi4Fm4cEb_eduxhvkbqkBpGRkDIceuv1M' \
+   ${OKTA_DOMAIN}/oauth2/default/v1/token
+
