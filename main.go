@@ -21,14 +21,14 @@ var wg sync.WaitGroup
 var code string
 var stateResponse string
 
-func AuthServer() (string, string) {
+func AuthServer() map[string]interface{} {
 	domain := os.Getenv("OKTA_ISSUER_URI")
 	response, _ := http.Get(domain + "/.well-known/oauth-authorization-server")
 	body, _ := ioutil.ReadAll(response.Body)
 	defer response.Body.Close()
 	var result map[string]interface{}
 	json.Unmarshal(body, &result)
-	return result["authorization_endpoint"].(string), result["token_endpoint"].(string)
+	return result
 }
 
 func Authorize(c *gin.Context) {
@@ -58,40 +58,52 @@ func GenerateURL(auth_server string, state string) {
 	fmt.Println("Enter this URL into a browser:", request.URL.String())
 }
 
-func ExchangeCodeForToken(token_server string, code string) string {
-	client_id := os.Getenv("OKTA_CLIENT_ID")
-	client_secret := os.Getenv("OKTA_CLIENT_SECRET")
-	auth := "Basic " + b64.URLEncoding.EncodeToString([]byte(client_id+":"+client_secret))
+func API(server string, auth string, values url.Values) map[string]interface{} {
+	client := &http.Client{}
+	request, _ := http.NewRequest("POST", server, strings.NewReader(values.Encode()))
+	request.Header.Set("Authorization", auth)
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
+	response, _ := client.Do(request)
+	var result map[string]interface{}
+	json.NewDecoder(response.Body).Decode(&result)
+	return result
+}
+
+func ExchangeCodeForToken(server string, auth string, code string) string {
 	values := url.Values{}
 	values.Set("grant_type", "authorization_code")
 	values.Set("code", code)
 	values.Set("redirect_uri", "http://localhost:8080/callback")
 
-	client := &http.Client{}
-	request, _ := http.NewRequest("POST", token_server, strings.NewReader(values.Encode()))
-	request.Header.Set("Authorization", auth)
-	request.Header.Set("Accept", "application/json")
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	result := API(server, auth, values)
+	return result["access_token"].(string)
+}
 
-	response, error := client.Do(request)
-	fmt.Println(response, error)
-	var result map[string]interface{}
-	json.NewDecoder(response.Body).Decode(&result)
-	fmt.Println(result)
-	return ""
+func Introspect(server string, auth string, token string) {
+	values := url.Values{}
+	values.Set("token", token)
+	values.Set("token_hint_type", "access_token")
+
+	result := API(server, auth, values)
+	fmt.Println(result["username"])
 }
 
 func main() {
 	wg.Add(1)
 	go HttpServer()
 
+	client_id := os.Getenv("OKTA_CLIENT_ID")
+	client_secret := os.Getenv("OKTA_CLIENT_SECRET")
+	auth := "Basic " + b64.URLEncoding.EncodeToString([]byte(client_id+":"+client_secret))
+
 	state_bytes := make([]byte, 5)
 	rand.Read(state_bytes)
 	state := hex.EncodeToString(state_bytes)
 
-	auth_server, token_server := AuthServer()
-	GenerateURL(auth_server, state)
+	servers := AuthServer()
+	GenerateURL(servers["authorization_endpoint"].(string), state)
 
 	wg.Wait()
 
@@ -101,6 +113,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	ExchangeCodeForToken(token_server, code)
-	// Make API call
+	access_token := ExchangeCodeForToken(servers["token_endpoint"].(string), auth, code)
+	Introspect(servers["introspection_endpoint"].(string), auth, access_token)
 }
