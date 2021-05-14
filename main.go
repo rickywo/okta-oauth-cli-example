@@ -22,7 +22,7 @@ var code string
 var stateResponse string
 
 func AuthServer() (string, string) {
-	domain := os.Getenv("OKTA_DOMAIN")
+	domain := os.Getenv("OKTA_ISSUER_URI")
 	response, _ := http.Get(domain + "/.well-known/oauth-authorization-server")
 	body, _ := ioutil.ReadAll(response.Body)
 	defer response.Body.Close()
@@ -72,7 +72,7 @@ func ExchangeCodeForToken(token_server string, code string) string {
 	request, _ := http.NewRequest("POST", token_server, strings.NewReader(values.Encode()))
 	request.Header.Set("Authorization", auth)
 	request.Header.Set("Accept", "application/json")
-	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	response, error := client.Do(request)
 	fmt.Println(response, error)
@@ -102,5 +102,5 @@ func main() {
 	}
 
 	ExchangeCodeForToken(token_server, code)
-	// Mke API call
+	// Make API call
 }
