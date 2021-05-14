@@ -55,7 +55,7 @@ func GenerateURL(auth_server string, state string) {
 	query.Add("state", state)
 	query.Add("scope", "openid")
 	request.URL.RawQuery = query.Encode()
-	fmt.Println("Enter this URL into a browser:", request.URL.String())
+	fmt.Println("Enter this URL into a browser:\n", request.URL.String())
 }
 
 func API(server string, auth string, values url.Values) map[string]interface{} {
@@ -87,7 +87,7 @@ func Introspect(server string, auth string, token string) {
 	values.Set("token_hint_type", "access_token")
 
 	result := API(server, auth, values)
-	fmt.Println(result["username"])
+	fmt.Println("Active:", result["active"], "Username:", result["username"])
 }
 
 func main() {
