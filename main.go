@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/joho/godotenv"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -20,6 +22,15 @@ import (
 var wg sync.WaitGroup
 var code string
 var stateResponse string
+
+func init() {
+
+	err := godotenv.Load(".env")
+
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+}
 
 func AuthServer() map[string]interface{} {
 	domain := os.Getenv("OKTA_ISSUER_URI")
@@ -42,8 +53,8 @@ func Authorize(c *gin.Context) {
 
 func HttpServer() {
 	r := gin.Default()
-	r.GET("/callback", Authorize)
-	r.Run(":8080")
+	r.GET("/authorization-code/callback", Authorize)
+	r.Run(":8088")
 }
 
 func GenerateURL(auth_server string, state string) {
@@ -51,7 +62,7 @@ func GenerateURL(auth_server string, state string) {
 	query := request.URL.Query()
 	query.Add("response_type", "code")
 	query.Add("client_id", os.Getenv("OKTA_CLIENT_ID"))
-	query.Add("redirect_uri", "http://localhost:8080/callback")
+	query.Add("redirect_uri", "http://localhost:8088/authorization-code/callback")
 	query.Add("state", state)
 	query.Add("scope", "openid")
 	request.URL.RawQuery = query.Encode()
@@ -75,7 +86,7 @@ func ExchangeCodeForToken(server string, auth string, code string) string {
 	values := url.Values{}
 	values.Set("grant_type", "authorization_code")
 	values.Set("code", code)
-	values.Set("redirect_uri", "http://localhost:8080/callback")
+	values.Set("redirect_uri", "http://localhost:8088/authorization-code/callback")
 
 	result := API(server, auth, values)
 	return result["access_token"].(string)
